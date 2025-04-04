@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === "development") {
 
 app.get("/api", (req, res) => {
   res.send(
-    "Mock API is running. Use POST /generate-mock to generate mock data."
+    "Mock API is running. Use POST /api/generate-mock to generate mock data."
   );
 });
 
@@ -50,7 +50,7 @@ app.post(
   })
 );
 
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({ status: "OK" });
 });
 
