@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import morgan from "morgan";
 import bodyParser from "body-parser";
 import catchAsync from "./utils/catchAsync";
@@ -13,7 +13,7 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-app.get("/api", (req, res) => {
+app.get("/api", (req: Request, res: Response) => {
   res.send(
     "Mock API is running. Use POST /api/generate-mock to generate mock data."
   );
@@ -21,7 +21,7 @@ app.get("/api", (req, res) => {
 
 app.post(
   "/api/generate-mock",
-  catchAsync(async (req, res, next) => {
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     const { interfaceString, count } = req.body;
 
     // Validate input
@@ -50,7 +50,7 @@ app.post(
   })
 );
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (req: Request, res: Response) => {
   res.json({ status: "OK" });
 });
 
