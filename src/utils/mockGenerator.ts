@@ -1,3 +1,5 @@
+import { faker } from "@faker-js/faker";
+
 type PropertyType =
   | "string"
   | "number"
@@ -39,7 +41,6 @@ export function parseInterface(interfaceStr: string): InterfaceSchema {
 
   // Extract properties
   const propertiesMatch = interfaceStr.match(/{([^}]+)}/);
-
   if (!propertiesMatch) {
     throw new Error("Invalid interface format: could not find properties");
   }
@@ -176,4 +177,322 @@ function mapTypeString(typeStr: string): PropertyType {
 
   // Default to 'any' for unknown types
   return "any";
+}
+
+/**
+ * Generate mock data based on the parsed interface schema
+ */
+export function generateMockData(schema: InterfaceSchema, count = 1): any[] {
+  const results = [];
+
+  // Determine if this is a user-related interface
+  const isUserInterface =
+    schema.name.toLowerCase().includes("user") ||
+    schema.properties.some(
+      (p) =>
+        p.name.toLowerCase() === "email" && p.name.toLowerCase() === "password"
+    );
+
+  // Determine if this is a product-related interface
+  const isProductInterface =
+    schema.name.toLowerCase().includes("product") ||
+    schema.properties.some(
+      (p) =>
+        (p.name.toLowerCase() === "price" ||
+          p.name.toLowerCase() === "instock") &&
+        p.name.toLowerCase().includes("category")
+    );
+
+  for (let i = 0; i < count; i++) {
+    const item: Record<string, any> = {};
+
+    for (const prop of schema.properties) {
+      // Skip optional properties sometimes
+      if (prop.isOptional && Math.random() > 0.7) {
+        continue;
+      }
+
+      if (prop.isArray) {
+        const arrayLength = Math.floor(Math.random() * 5) + 1;
+        item[prop.name] = Array.from({ length: arrayLength }, () =>
+          generateValueForType(
+            prop.arrayType || "any",
+            prop,
+            isUserInterface,
+            isProductInterface
+          )
+        );
+      } else {
+        item[prop.name] = generateValueForType(
+          prop.type,
+          prop,
+          isUserInterface,
+          isProductInterface
+        );
+      }
+    }
+
+    results.push(item);
+  }
+
+  return results;
+}
+
+// Update the generateValueForType function signature to include isProductInterface
+function generateValueForType(
+  type: PropertyType,
+  prop: PropertyDefinition,
+  isUserInterface = false,
+  isProductInterface = false
+): any {
+  // Special handling for enum types
+  if (type === "enum" && prop.enumValues && prop.enumValues.length > 0) {
+    return faker.helpers.arrayElement(prop.enumValues);
+  }
+
+  // Special handling for product-related fields
+  if (isProductInterface || prop.name.toLowerCase().includes("product")) {
+    if (prop.name.toLowerCase() === "category") {
+      return faker.commerce.department();
+    }
+
+    if (prop.name.toLowerCase().includes("description") && type === "string") {
+      return faker.commerce.productDescription();
+    }
+
+    if (
+      prop.name.toLowerCase() === "name" ||
+      prop.name.toLowerCase().includes("title")
+    ) {
+      return faker.commerce.productName();
+    }
+
+    if (prop.name.toLowerCase().includes("material")) {
+      return faker.commerce.productMaterial();
+    }
+
+    if (prop.name.toLowerCase().includes("color")) {
+      return faker.color.human();
+    }
+  }
+
+  // Special handling for user-related fields
+  if (isUserInterface || prop.name.toLowerCase().includes("user")) {
+    if (
+      prop.name.toLowerCase() === "name" ||
+      prop.name.toLowerCase() === "username" ||
+      prop.name.toLowerCase() === "fullname"
+    ) {
+      return faker.person.fullName();
+    }
+
+    if (prop.name.toLowerCase().includes("firstname")) {
+      return faker.person.firstName();
+    }
+
+    if (prop.name.toLowerCase().includes("lastname")) {
+      return faker.person.lastName();
+    }
+
+    if (prop.name.toLowerCase() === "email") {
+      return faker.internet.email();
+    }
+
+    if (
+      prop.name.toLowerCase().includes("password") &&
+      prop.name.toLowerCase().includes("hash")
+    ) {
+      // Generate a realistic looking password hash (like bcrypt)
+      return `$2a$10$${faker.string.alphanumeric(53)}`;
+    }
+
+    if (prop.name.toLowerCase().includes("password")) {
+      // For actual passwords (not hashes), generate a strong password
+      return faker.internet.password({ length: 12 });
+    }
+
+    if (
+      prop.name.toLowerCase().includes("avatar") ||
+      (prop.name.toLowerCase().includes("profile") &&
+        prop.name.toLowerCase().includes("image"))
+    ) {
+      return faker.image.avatar();
+    }
+
+    if (prop.name.toLowerCase() === "role" && type === "string") {
+      return faker.helpers.arrayElement(["user", "admin", "editor", "guest"]);
+    }
+  }
+
+  // For other types, use the standard generators
+  switch (type) {
+    case "string":
+      // Use different string generators based on property name
+      if (prop.name.toLowerCase() === "id") {
+        return faker.string.uuid();
+      }
+      if (prop.name.toLowerCase().includes("name")) {
+        if (isUserInterface) {
+          return faker.person.fullName();
+        }
+        return faker.commerce.productName();
+      }
+      if (prop.name.toLowerCase().includes("email")) {
+        return faker.internet.email();
+      }
+      if (prop.name.toLowerCase().includes("phone")) {
+        return faker.phone.number();
+      }
+      if (prop.name.toLowerCase().includes("address")) {
+        return faker.location.streetAddress();
+      }
+      if (prop.name.toLowerCase().includes("city")) {
+        return faker.location.city();
+      }
+      if (prop.name.toLowerCase().includes("country")) {
+        return faker.location.country();
+      }
+      if (
+        prop.name.toLowerCase().includes("zip") ||
+        prop.name.toLowerCase().includes("postal")
+      ) {
+        return faker.location.zipCode();
+      }
+      if (prop.name.toLowerCase().includes("url")) {
+        if (
+          prop.name.toLowerCase().includes("image") ||
+          prop.name.toLowerCase().includes("avatar") ||
+          prop.name.toLowerCase().includes("photo")
+        ) {
+          if (isUserInterface) {
+            return faker.image.avatar();
+          }
+          return `https://loremflickr.com/640/480/product?random=${faker.number.int(
+            100
+          )}`;
+        }
+        return faker.internet.url();
+      }
+      if (
+        prop.name.toLowerCase().includes("image") ||
+        prop.name.toLowerCase().includes("photo")
+      ) {
+        if (isUserInterface) {
+          return faker.image.avatar();
+        }
+        return `https://loremflickr.com/640/480/product?random=${faker.number.int(
+          100
+        )}`;
+      }
+      // Default string
+      return faker.lorem.words(3);
+
+    case "number":
+      if (prop.name.toLowerCase() === "id") {
+        return faker.number.int({ min: 1, max: 10000 });
+      }
+      if (prop.name.toLowerCase().includes("age")) {
+        return faker.number.int({ min: 18, max: 80 });
+      }
+      if (
+        prop.name.toLowerCase().includes("price") ||
+        prop.name.toLowerCase().includes("amount")
+      ) {
+        return Number.parseFloat(faker.commerce.price({ min: 1, max: 1000 }));
+      }
+      if (prop.name.toLowerCase().includes("year")) {
+        return faker.number.int({ min: 1970, max: 2023 });
+      }
+      // Default number
+      return faker.number.float({ min: 0, max: 1000, fractionDigits: 2 });
+
+    case "boolean":
+      if (
+        prop.name.toLowerCase().includes("active") ||
+        prop.name.toLowerCase().includes("enabled")
+      ) {
+        // Make users more likely to be active
+        return Math.random() > 0.2;
+      }
+      if (
+        prop.name.toLowerCase().includes("verified") ||
+        prop.name.toLowerCase().includes("confirmed")
+      ) {
+        // Make users more likely to be verified
+        return Math.random() > 0.3;
+      }
+      if (
+        prop.name.toLowerCase().includes("stock") ||
+        prop.name.toLowerCase().includes("available")
+      ) {
+        // Make products more likely to be in stock than not
+        return Math.random() > 0.3;
+      }
+      if (
+        prop.name.toLowerCase().includes("featured") ||
+        prop.name.toLowerCase().includes("popular")
+      ) {
+        // Make products less likely to be featured
+        return Math.random() > 0.7;
+      }
+      return faker.datatype.boolean();
+
+    case "Date":
+      if (prop.name.toLowerCase().includes("created")) {
+        // Created within the last year
+        return faker.date.past({ years: 1 });
+      }
+      if (prop.name.toLowerCase().includes("updated")) {
+        // Updated more recently
+        return faker.date.recent({ days: 30 });
+      }
+      if (
+        prop.name.toLowerCase().includes("expiry") ||
+        prop.name.toLowerCase().includes("expiration")
+      ) {
+        return faker.date.future({ years: 2 });
+      }
+      if (prop.name.toLowerCase().includes("birth")) {
+        return faker.date.birthdate();
+      }
+      // Default date (recent)
+      return faker.date.recent();
+
+    case "object":
+      if (!prop.objectProperties) return {};
+
+      const obj: Record<string, any> = {};
+      for (const nestedProp of prop.objectProperties) {
+        if (nestedProp.isOptional && Math.random() > 0.7) {
+          continue;
+        }
+
+        obj[nestedProp.name] = generateValueForType(
+          nestedProp.type,
+          nestedProp,
+          isUserInterface,
+          isProductInterface
+        );
+      }
+      return obj;
+
+    case "null":
+      return null;
+
+    case "undefined":
+      return undefined;
+
+    case "any":
+    default:
+      // For 'any' type, randomly choose between string, number, boolean
+      const randomType = Math.floor(Math.random() * 3);
+      switch (randomType) {
+        case 0:
+          return faker.lorem.word();
+        case 1:
+          return faker.number.int(100);
+        case 2:
+          return faker.datatype.boolean();
+      }
+  }
 }
